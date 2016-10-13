@@ -19,11 +19,19 @@ no warnings 'experimental';
 use DDP;
 p parse_json('[{"sss" : 12312,"ddsss" : "hhhh"},]');
 
+# Функция получает ссылку на строку и парсит первую найденную структуру 
+# и затирает строку с ней
+sub parse_first_struct {
+	my $source = shift;
+	say "parse_json: $source";
+	
+	 
+}
 
 sub parse_json {
 	my $source = shift;
 	say "parse_json: $source";
-	my $res;
+	my $res;	
 	
 	given ($source) {
 		when (/^\s*"(.*)"\s*$/m) {
@@ -48,13 +56,36 @@ sub parse_json {
 		when (/^\s*\[(.*)\]\s*$/m) {
 			my @res;
 			my $content = $1;
+			for ($content) {
+				while (pos < length) {
+					if (/\G\s*(".*")s*[,$]/m) {
+						push @res, parse_json($1);
+					}
+					elsif (/\G\s*(\d+(\.\d+)?(e[\+-]?\d+)?)\s*[,$]/m) {
+						push @res, parse_json($1);
+					}
+					elsif (/\G\s*(\{|\[)/m) {
+						my $el = $1;
+						my @brackets = ($1);
+						while (/\G.*([\{\[\]\}])/m && $brackets) {
+							$el .= 
+							if ($2 =~ /\{\[/) {
+								
+							}
+						}
+					}
+					else {
+						{ die "Не валидная структура $content"; }
+					}
+				}
+			}
 			my @arr = split ',', $content;
 			for (@arr) {
 				push @res, parse_json($_);
 			}
 			return \@res;
 		}
-		default { die "Не валидный элемент $_"; }
+		default { die "Не валидная структура $_"; }
 	}
 	
 	

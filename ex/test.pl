@@ -15,9 +15,5 @@ open my $f, '<:raw', $file or die "Can't open file `$file': $!\n";
 my $source = do { local $/; <$f> };
 close $f;
 
-eval {		
-	my $data = parse_json( $source );
-1} or do {
-	print "Error: $@";
-}
+my $data = parse_json( $source );
 p $data;

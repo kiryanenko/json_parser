@@ -17,81 +17,71 @@ BEGIN{
 no warnings 'experimental';
 
 use DDP;
-p parse_json('[{"sss" : 12312,"ddsss" : "hhhh"},]');
+#p parse_json('{ "key1": "string value", "key2": -3.1415, "key3": ["nested array"], "key4": { "nested": "object" } }');
 
 # Функция получает ссылку на строку и парсит первую найденную структуру 
 # и затирает строку с ней
 sub parse_first_struct {
 	my $source = shift;
-	say "parse_json: $source";
+	#say "parse_json: $$source";
 	
-	 
+	if ( $$source =~ s/^\s*"(.*?)(?<!\\)"//s ) {
+		my $str = $1;
+		
+		$str =~ s/\\t/\t/g;
+		$str =~ s/\\n/\n/g;		
+		$str =~ s/\\"/\"/g;
+		
+		$str =~ s/\\u(\d+)/chr(hex($1))/ge;
+		
+		return $str;
+	}
+	elsif ( $$source =~ s/^\s*([+-]?\d+(\.\d+)?(e[\+-]?\d+)?)//s ) {
+		return 0 + $1;
+	}
+	elsif ( $$source =~ s/^\s*\[//s ) {
+		my @res;			
+		while ( $$source !~ s/^\s*\]//s ) {
+			push @res, parse_first_struct($source);
+			if ( $$source =~ s/^\s*,//s ) {				
+				die 'В массиве "висящая" запятая' if $$source =~ /^\s*\]/s;
+			} else {
+				die "В массиве перед $$source пропущена запятая" 
+					unless $$source =~ /^\s*\]/s
+			}
+		}
+		return \@res;
+	}
+	elsif ( $$source =~ s/^\s*\{//s ) {
+		my %res;
+		while ( $$source !~ s/^\s*\}//s ) {
+			if ($$source =~ s/^\s*"(\w+)"\s*://s) {
+				my $key = $1;
+				$res{$key} = parse_first_struct($source);
+				if ( $$source =~ s/^\s*,//s ) {				
+					die 'В объекте "висящая" запятая' if $$source =~ /^\s*\}/s;
+				} else {
+					die "В объекте перед $$source пропущена запятая" 
+						unless $$source =~ /^\s*\}/s
+				}
+			} else {
+				die "В объекте не валидный элемент $$source"
+			}
+		}
+		return \%res;
+	}
+	else { 
+		die "Не валидная структура $$source"; 
+	}
 }
 
 sub parse_json {
 	my $source = shift;
-	say "parse_json: $source";
-	my $res;	
 	
-	given ($source) {
-		when (/^\s*"(.*)"\s*$/m) {
-			return $1;
-		}
-		when (/^\s*(\d+(\.\d+)?(e[\+-]?\d+)?)\s*$/m) {
-			return 0 + $1;
-		}
-		when (/^\s*\{(.*)\}\s*$/m) {
-			my %res;
-			my $content = $1;
-			my @arr = split ',', $content;
-			for (@arr) {
-				if (/^\s*"(\w+)"\s*:\s*(.+)\s*$/m) {
-					$res{$1} = parse_json($2);
-				} else {
-					die "Не валидный элемент $_";
-				}
-			}
-			return \%res;
-		}
-		when (/^\s*\[(.*)\]\s*$/m) {
-			my @res;
-			my $content = $1;
-			for ($content) {
-				while (pos < length) {
-					if (/\G\s*(".*")s*[,$]/m) {
-						push @res, parse_json($1);
-					}
-					elsif (/\G\s*(\d+(\.\d+)?(e[\+-]?\d+)?)\s*[,$]/m) {
-						push @res, parse_json($1);
-					}
-					elsif (/\G\s*(\{|\[)/m) {
-						my $el = $1;
-						my @brackets = ($1);
-						while (/\G.*([\{\[\]\}])/m && $brackets) {
-							$el .= 
-							if ($2 =~ /\{\[/) {
-								
-							}
-						}
-					}
-					else {
-						{ die "Не валидная структура $content"; }
-					}
-				}
-			}
-			my @arr = split ',', $content;
-			for (@arr) {
-				push @res, parse_json($_);
-			}
-			return \@res;
-		}
-		default { die "Не валидная структура $_"; }
-	}
+	use JSON::XS;	
+	#return JSON::XS->new->utf8->decode($source);
 	
-	
-	#use JSON::XS;	
-	# return JSON::XS->new->utf8->decode($source);
-	#return {};
+	return parse_first_struct(\$source);
 }
 
 1;
